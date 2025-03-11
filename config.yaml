@@ -1,0 +1,11 @@
+credentials:
+  usernames:
+    jose.lucas:
+      email: jose.lucas@grupomoura.com
+      logged_in: False
+      name: José Lucas
+      password: "22142213"
+cookie:
+  expiry_days: 1
+  key: some_signature_key
+  name: some_cookie_name
