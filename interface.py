@@ -93,10 +93,7 @@ if st.session_state["authentication_status"]:
 
     CUSTO_FINANCEIRO = impostos.custo_financeiro(selected_pagamento, selected_parcelas)
 
-    df_clm4 = pd.DataFrame({
-        'Tributo': ['IPI','COFINS','PIS','ICMS','IRPJ','CSLL'], 
-        'Alíquotas': [f"{(IPI*100):.2f}%",f"{COFINS*100:.2f}%", f"{PIS*100:.2f}%", f"{ICMS_compra*100:.2f}%",f"{IRPJ*100:.2f}%",f"{CSLL*100:.2f}%"]
-    })
+    
     compra_valor_PIS_COFINS = (VALOR/(1-(PIS+COFINS)))*(PIS+COFINS)
     compra_valor_ICMS = ((VALOR + compra_valor_PIS_COFINS)-(1-ICMS_compra))*(ICMS_compra)
     compra_valor_IPI = (VALOR+compra_valor_PIS_COFINS+compra_valor_ICMS)*IPI
@@ -108,13 +105,23 @@ if st.session_state["authentication_status"]:
     })
 
     #Seção precificação
-    CUSTOS = Custos(VALOR,regime, COFINS, PIS, ICMS_compra, ICMS_venda, IRPJ, CSLL, IPI, CUSTO_FINANCEIRO)
+    CUSTOS_compra = Custos(VALOR,regime, COFINS, PIS, ICMS_compra, ICMS_venda, IRPJ, CSLL, IPI, CUSTO_FINANCEIRO)
+    CUSTOS_venda = Custos(VALOR,regime, COFINS_venda, PIS_venda, ICMS_compra, ICMS_venda, IRPJ, CSLL, IPI, CUSTO_FINANCEIRO)
     
-    CUSTO_BIN = CUSTOS.custo_BIN(valor_BIN, peso_BIN)
-    CUSTO_NF = CUSTOS.custo_total()
+    df_dre_venda = pd.DataFrame({
+        'Tributo': ['COFINS','PIS','ICMS','IRPJ','CSLL'], 
+        'Alíquotas': [f"{COFINS_venda*100:.2f}%", f"{PIS_venda*100:.2f}%", f"{ICMS_venda*100:.2f}%",f"{IRPJ*100:.2f}%",f"{CSLL*100:.2f}%"]
+    })
+    df_clm4 = pd.DataFrame({
+        'Tributo': ['IPI','COFINS','PIS','ICMS'], 
+        'Alíquotas': [f"{(IPI*100):.2f}%",f"{COFINS*100:.2f}%", f"{PIS*100:.2f}%", f"{ICMS_compra*100:.2f}%"]
+    })
+    
+    CUSTO_BIN = CUSTOS_compra.custo_BIN(valor_BIN, peso_BIN)
+    CUSTO_NF = CUSTOS_compra.custo_total()
     CUSTO_TOTAL = CUSTO_NF + CUSTO_BIN + frete_cliente + frete_fabrica
 
-    PRECO_FINAL = CUSTOS.precificacao(CUSTO_TOTAL, MARGEM)
+    PRECO_FINAL = CUSTOS_venda.precificacao(CUSTO_TOTAL, MARGEM)
 
     #Detalhamento do resultado
     valor_ICMS = ICMS_venda * PRECO_FINAL
@@ -147,8 +154,10 @@ if st.session_state["authentication_status"]:
         'Valores': [PRECO_FINAL, valor_impostos, valor_COFINS, valor_PIS, valor_ICMS, receita_pos_deducoes, custo_Baterias, lucro_bruto, despesas_operacionais, CUSTO_BIN, despesa_financeira, frete_unidade, frete_cliente, lucroliquido_antesdoir, despesas_tributarias, valor_CSLL, valor_IRPJ, lucro_liquido_apos_IR]
     })
 
-    # Conta_dre = ['Receita bruta', '(-) IMPOSTOS', '(-) CUSTO DAS BATERIAS', '(-) DESPESAS OPERACIONAIS', 'DESPESAS TRIBUTÁRIAS', 'LUCRO LÍQUIDO APÓS IR/CSLL']
-    # Valores_dre = [PRECO_FINAL, -valor_impostos, -custo_Baterias, -despesas_operacionais, -despesas_tributarias, lucro_liquido_apos_IR]
+    Conta_dre_df = ['Receita bruta', '(-) IMPOSTOS', '(-) CUSTO DAS BATERIAS', '(-) DESPESAS OPERACIONAIS', 'DESPESAS TRIBUTÁRIAS', 'LUCRO LÍQUIDO APÓS IR/CSLL']
+    Valores_dre_df = [PRECO_FINAL, -valor_impostos, -custo_Baterias, -despesas_operacionais, -despesas_tributarias, lucro_liquido_apos_IR]
+    Valores_dre_df = [f"R$ {valor:.2f}" for valor in Valores_dre_df]
+    
     Conta_dre = ['Receita bruta','COFINS', 'PIS', 'ICMS','CUSTO DAS BATERIAS', 'Custo BIN', 'DESPESA FINANCEIRA', 'FRETE P/ UNIDADE', 'FRETE P/ CLIENTE', 'CSLL', 'IRPJ']
     Valores_dre = [PRECO_FINAL, -valor_COFINS, -valor_PIS, -valor_ICMS, -custo_Baterias,-CUSTO_BIN, -despesa_financeira, -frete_unidade, -frete_cliente, -valor_CSLL, -valor_IRPJ]
 
@@ -159,33 +168,37 @@ if st.session_state["authentication_status"]:
     container_custos.subheader("Custos aquisição bateria")
     clm3, clm4= container_custos.columns([0.7, 0.3], vertical_alignment= 'center')
     
-    # Verificação dos dados
-    if len(Conta_dre) == len(Valores_dre):
-        # Criando o gráfico de cascata
-        fig_dre = go.Figure(go.Waterfall(
-            name="DRE",  # Nome do gráfico
-            orientation="v",  # Orientação vertical
-            x=Conta_dre,  # Eixo X com as categorias
-            y=Valores_dre,  # Eixo Y com os valores
-            textposition="outside",  # Posição do texto (fora das barras)
-            text=[f"R${v:,.2f}" for v in Valores_dre],  # Texto exibido nas barras
-            connector={"line": {"color": "gray"}},  # Linha de conexão entre as barras
-        ))
+    # Criando o gráfico de cascata
+    fig_dre = go.Figure(go.Waterfall(
+        name="DRE",  # Nome do gráfico
+        orientation="v",  # Orientação vertical
+        x=Conta_dre,  # Eixo X com as categorias
+        y=Valores_dre,  # Eixo Y com os valores
+        textposition="outside",  # Posição do texto (fora das barras)
+        text=[f"R${v:,.2f}" for v in Valores_dre],  # Texto exibido nas barras
+        connector={"line": {"color": "gray"}},  # Linha de conexão entre as barras
+    ))
 
-        # Personalizando o layout
-        fig_dre.update_layout(
-            title="Demonstração do Resultado do Exercício (DRE)",
-            xaxis_title="Categorias",
-            yaxis_title="Valores (R$)",
-            showlegend=False,
-        )
+    # Personalizando o layout
+    fig_dre.update_layout(
+        title="Demonstração do Resultado do Exercício (DRE)",
+        xaxis_title="Categorias",
+        yaxis_title="Valores (R$)",
+        showlegend=False,
+    )
 
-        # Exibindo o gráfico no Streamlit
-        container_dre.subheader("Detalhamento resultado")
-        container_dre.plotly_chart(fig_dre)
-    else:
-        container_dre.error("Erro: As listas 'Conta_dre' e 'Valores_dre' têm tamanhos diferentes.")
+    # Exibindo o gráfico no Streamlit
+    clm_dre.subheader("Detalhamento resultado")
+    clm_dre.plotly_chart(fig_dre)
+    clmtable_dre.dataframe(df_dre_venda, hide_index=True)
+    
+    dre = pd.DataFrame({
+        'Conta' : Conta_dre_df,
+        'Valores' : Valores_dre_df
+    })
 
+    clm_dre.table(dre)
+        
     clm1.text(f"UF destino: {uf_destino}")
     clm1.text(f"Código do produto: {cod_produto}")
     clm1.text(f"Nome do produto: {nome_produto}")
@@ -193,14 +206,14 @@ if st.session_state["authentication_status"]:
 
     clm2.metric("Preço sugerido:", f"R$ {PRECO_FINAL:,.2f}")
     clm2.metric("Lucro Líquido Após IR/CSLL:", f"R$ {lucro_liquido_apos_IR:,.2f}")
-
-
+    
     clm3.metric("Custo total:",f"R$ {(CUSTO_NF+frete_fabrica):.2f}")
     fig_custos = px.bar(df_precificacao, barmode='group', color='Contas',x='Tipo', y='Valores', text='Valores')
     fig_custos.update_traces(texttemplate='R$ %{text:.2f}', textposition='outside')
     clm3.plotly_chart(fig_custos)
 
     clm4.dataframe(df_clm4, hide_index=True)
+    
 
 elif st.session_state["authentication_status"] is False:
     st.error('Usuário/Senha é inválido')

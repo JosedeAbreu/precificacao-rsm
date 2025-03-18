@@ -14,6 +14,7 @@ class Custos:
         self.CUSTO_FINANCEIRO = CUSTO_FINANCEIRO
         
     def precificacao(self, CUSTO_TOTAL, MARGEM):
+        
         if self.REGIME == 'Lucro presumido':
             preco = CUSTO_TOTAL / (1 - (self.ICMS_venda + ((self.COFINS + self.PIS) * (1 - self.ICMS_venda)) + (self.CUSTO_FINANCEIRO) + (MARGEM) + (self.IRPJ + self.CSLL)))
             return preco
